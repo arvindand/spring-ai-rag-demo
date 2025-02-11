@@ -1,0 +1,17 @@
+spring:
+  docker:
+      compose:
+        lifecycle-management: START_ONLY
+  application:
+    name: rag
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: gpt-4o-mini
+          temperature: 0.7
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+
