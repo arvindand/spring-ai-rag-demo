@@ -3,7 +3,7 @@ spring:
       compose:
         lifecycle-management: START_ONLY
   application:
-    name: rag
+    name: rag-springai
   ai:
     openai:
       api-key: ${OPENAI_API_KEY}

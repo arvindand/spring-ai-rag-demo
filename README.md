@@ -46,13 +46,6 @@ This project illustrates how to:
 OPENAI_API_KEY=your_api_key_here
 ```
 
-2. Update `application.properties`:
-```properties
-spring.ai.openai.api-key=${OPENAI_API_KEY}
-spring.ai.openai.chat.model=gpt-4
-spring.ai.vectorstore.pgvector.initialize-schema=true
-```
-
 ## Running the Application
 
 1. Start Docker Desktop.

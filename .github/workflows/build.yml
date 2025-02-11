@@ -9,4 +9,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+      - name: Make mvnw executable
+        run: chmod +x ./mvnw
       - run: ./mvnw clean verify
