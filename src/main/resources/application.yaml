@@ -1,17 +1,69 @@
 spring:
-  docker:
-      compose:
-        lifecycle-management: START_ONLY
   application:
-    name: rag-springai
+    name: spring-ai-rag-demo
+
+  # Docker Compose integration
+  docker:
+    compose:
+      lifecycle-management: START_ONLY
+
+  # File upload configuration
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  # Database configuration (for chat memory)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ragdemo
+    username: user
+    password: password
+
+  # Spring AI Configuration
   ai:
+    # OpenAI settings
     openai:
       api-key: ${OPENAI_API_KEY}
       chat:
         options:
           model: gpt-4o-mini
           temperature: 0.7
+
+    # Vector store settings
     vectorstore:
       pgvector:
         initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1536
+
+    # Chat memory settings
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: ALWAYS
+      client:
+        observations:
+          include-input: true
+
+# Server configuration
+server:
+  port: 8080
+
+# Actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+# Logging
+logging:
+  level:
+    "[org.springframework.ai]": INFO
+    "[com.arvindand.rag]": DEBUG
 

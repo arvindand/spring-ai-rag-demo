@@ -1,0 +1,29 @@
+Q: What's the difference between the /api/v2/chat and /v1/chat/completions endpoints?
+A: /api/v2/chat is the main API with streaming support and conversation memory. /v1/chat/completions is OpenAI-compatible so you can connect Open WebUI or other tools that expect the OpenAI format.
+
+Q: How do I switch to a different model?
+A: Set spring.ai.openai.chat.options.model in application.yaml. For cheaper testing, use gpt-4o-mini. For local models, add the Ollama starter instead.
+
+Q: Where are conversations stored?
+A: In PostgreSQL via JDBC. The MessageWindowChatMemory keeps the last 20 messages per conversation ID. Restart the container with -v flag to clear them.
+
+Q: How do I add documents to the knowledge base?
+A: POST multipart files to /api/v2/documents. Supports PDF, TXT, and MD. Documents get chunked, embedded, and stored in PGVector.
+
+Q: What's the @Tool annotation for?
+A: It marks methods the LLM can call during generation. Spring AI generates a JSON schema from the method signature and handles the function calling protocol. The LLM decides when to use them based on your descriptions.
+
+Q: Why PGVector?
+A: It's PostgreSQL with vector search. You get a familiar database for chat memory and vector storage in one place. Good enough for most use cases without adding another service.
+
+Q: What are advisors?
+A: Interceptors for ChatClient. RetrievalAugmentationAdvisor handles RAG (searches vectors, adds context). MessageChatMemoryAdvisor injects conversation history. They chain together.
+
+Q: How do I change retrieval parameters?
+A: In ChatClientConfig, adjust similarityThreshold (relevance cutoff) and topK (number of results). Higher threshold = more relevant but fewer results.
+
+Q: What's the embedding dimension setting?
+A: Must match your embedding model. OpenAI's text-embedding-ada-002 uses 1536 dimensions. text-embedding-3-large uses 3072. Mismatch will cause errors.
+
+Q: Can I use this without Docker?
+A: Yes, install PostgreSQL with the pgvector extension manually. Update spring.datasource.url in application.yaml. Open WebUI is optional.

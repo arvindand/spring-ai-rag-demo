@@ -1,216 +1,186 @@
 # Spring AI RAG Demo
 
-![Java](https://img.shields.io/badge/java-21-ED8B00.svg?style=for-the-badge&logo=openjdk&logoColor=white)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.2-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
-![Spring AI](https://img.shields.io/badge/Spring%20AI-1.0.0--M5-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/postgresql-16-316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)
-![PGVector](https://img.shields.io/badge/PGVector-Vector%20Database-blue?style=for-the-badge)
-![Docker](https://img.shields.io/badge/docker-compose-0db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
-![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--mini-412991?style=for-the-badge&logo=openai&logoColor=white)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)
+RAG implementation using Spring AI 1.1.0, PGVector, and OpenAI. Includes conversation memory, tool calling, streaming, and an OpenAI-compatible API for Open WebUI integration.
 
-A demonstration of **Retrieval Augmented Generation (RAG)** using Spring AI and OpenAI's GPT models. This project showcases how to build intelligent document querying systems by combining Large Language Models (LLMs) with local document context and vector databases.
+## Stack
 
-## 🎯 Key Features
+- Spring Boot 3.5.8 / Spring AI 1.1.0
+- OpenAI GPT-4o-mini
+- PostgreSQL 16 + PGVector
+- Open WebUI (optional)
 
-- **📄 PDF Document Ingestion** - Automatic processing and vectorization of PDF documents
-- **🔍 Semantic Search** - Advanced similarity search using PostgreSQL with PGVector extension  
-- **🤖 AI-Powered Analysis** - Specialized endpoints for different types of financial queries
-- **🐳 Docker Setup** - Simple Docker Compose configuration for easy local development
-- **🎛️ Smart Caching** - Efficient document store management with duplicate prevention
+## Quick Start
 
-```mermaid
-flowchart TB
-    subgraph DocumentPipeline["📄 Document Processing Pipeline"]
-        direction TB
-        A[("Raw PDF Document")] --> B[Text Extraction]
-        B --> C[Chunk Splitting]
-        C --> D[Embedding Generation]
-        D --> E[(Vector Store)]
-    end
-
-    subgraph QueryPipeline["❓ Query Processing Pipeline"]
-        direction TB
-        F[("User Question")] --> G[Query Embedding]
-        G --> H[Semantic Search]
-        H --> I[Top-K Relevant Chunks]
-        I --> J[LLM Synthesis]
-        J --> K[("Final Answer")]
-    end
-
-    E <-.-> H
-
-    style DocumentPipeline fill:#f8fafc,stroke:#1e3a8a
-    style QueryPipeline fill:#f0fdf4,stroke:#14532d
-    style A fill:#e0f2fe,stroke:#0369a1
-    style E fill:#dbeafe,stroke:#1d4ed8
-    style F fill:#dcfce7,stroke:#15803d
-    style K fill:#dcfce7,stroke:#15803d
-    style J fill:#fef9c3,stroke:#eab308
-```
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- **Java 21** or higher
-- **Docker Desktop** (for PostgreSQL + PGVector)
-- **OpenAI API Key**
-
-### Setup & Run
-
-1. **Clone the repository**
 ```bash
-git clone <your-repo-url>
-cd spring-ai-rag-demo
-```
+# Set your OpenAI API key
+export OPENAI_API_KEY=sk-your-key
 
-2. **Set your OpenAI API key**
-```bash
-# Linux/macOS
-export OPENAI_API_KEY=your_api_key_here
+# Start PostgreSQL + PGVector
+docker compose up -d
 
-# Windows PowerShell
-$env:OPENAI_API_KEY="your_api_key_here"
-
-# Or create .env file
-echo "OPENAI_API_KEY=your_api_key_here" > .env
-```
-
-3. **Start the application**
-```bash
+# Run the app
 ./mvnw spring-boot:run
 ```
 
-The application automatically:
-- 🐘 Starts PostgreSQL database with PGVector extension
-- 📊 Initializes vector store schema
-- 📄 Ingests sample PDF document (if not already processed)
-- 🌐 Starts web server on **http://localhost:8080**
+App runs on `localhost:8080`.
 
-## 🔧 Architecture & Components
+## Testing the API
 
-### 📄 DocumentIngestionService
-Handles PDF processing and vector store population:
-- **Smart Ingestion** - Checks if documents are already processed
-- **Token Splitting** - Optimally chunks documents for embedding
-- **Vector Storage** - Stores embeddings in PostgreSQL with PGVector
-
-### 🎯 ChatController
-Provides specialized REST endpoints for different query types:
-- **`/factual`** - Extract specific data points and figures
-- **`/analytical`** - Comparative analysis across sectors
-- **`/complex`** - Multi-factor relationship analysis  
-- **`/forward`** - Risk assessment and strategic implications
-
-## 📝 API Examples
-
-### 💰 Factual Queries
-Get specific information about monetary policy decisions:
+### Health Check
 
 ```bash
-curl "http://localhost:8080/api/v1/analysis/factual?query=What%20was%20the%20Federal%20Reserve%20interest%20rate%20cut?"
+curl http://localhost:8080/actuator/health
 ```
 
-### 📊 Analytical Queries 
-Compare performance across different market sectors:
+### Basic Chat (with RAG)
 
 ```bash
-curl "http://localhost:8080/api/v1/analysis/analytical?query=Compare%20the%20performance%20of%20REITs%20versus%20bank%20stocks"
+curl -X POST http://localhost:8080/api/v2/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What is Spring AI?"}'
 ```
 
-### 🔗 Complex Relationship Queries
-Understand interconnected market impacts:
+With conversation memory:
 
 ```bash
-curl "http://localhost:8080/api/v1/analysis/complex?query=How%20did%20the%20rate%20cut%20affect%20both%20dollar%20and%20emerging%20markets?"
+curl -X POST http://localhost:8080/api/v2/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "My name is Alice", "conversationId": "session-123"}'
+
+curl -X POST http://localhost:8080/api/v2/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What is my name?", "conversationId": "session-123"}'
 ```
 
-### 🔮 Forward-Looking Queries
-Identify potential risks and future implications:
+### Streaming Chat
 
 ```bash
-curl "http://localhost:8080/api/v1/analysis/forward?query=What%20are%20the%20main%20risk%20factors%20identified?"
+curl -N http://localhost:8080/api/v2/chat/stream?message=Explain+RAG+in+3+sentences
 ```
 
-### 📤 Response Format
-
-All endpoints return plain text responses optimized for readability:
+### Upload Documents
 
 ```bash
-# Extract just the response content (Unix/Linux/macOS)
-curl "http://localhost:8080/api/v1/analysis/factual?query=What%20was%20the%20rate%20cut?" -s | jq -r '.content'
+# Upload a file to the vector store
+curl -X POST http://localhost:8080/api/v2/documents \
+  -F "file=@/path/to/document.pdf"
 
-# Windows PowerShell
-curl "http://localhost:8080/api/v1/analysis/factual?query=What%20was%20the%20rate%20cut?" | Select-Object -ExpandProperty Content
+# Clear all documents
+curl -X DELETE http://localhost:8080/api/v2/documents
 ```
 
-## 🛠️ Technical Stack
+### OpenAI-Compatible API
 
-| Technology | Purpose | Version |
-|------------|---------|---------|
-| **Spring Boot** | Application Framework | 3.4.2 |
-| **Spring AI** | LLM Integration | 1.0.0-M5 |
-| **PostgreSQL** | Vector Database | 16 |
-| **PGVector** | Vector Extension | Latest |
-| **OpenAI GPT** | Language Model | GPT-4o-mini |
-| **Docker Compose** | Container Orchestration | Latest |
-| **Java** | Runtime | 21 |
+Two models available:
 
-## 🎛️ Configuration
+- `spring-ai-chat` — General conversation (no RAG)
+- `spring-ai-rag` — Uses uploaded documents for context, includes source citations
 
-### Environment Variables
-```properties
-OPENAI_API_KEY=your_openai_api_key_here
+```bash
+# List available models
+curl http://localhost:8080/v1/models
+
+# General chat (no RAG)
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer my-session" \
+  -d '{
+    "model": "spring-ai-chat",
+    "messages": [{"role": "user", "content": "What is 2+2?"}]
+  }'
+
+# RAG-enabled chat (uses documents, shows sources)
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer my-session" \
+  -d '{
+    "model": "spring-ai-rag",
+    "messages": [{"role": "user", "content": "What is Spring AI?"}]
+  }'
+# Response includes: "---\n**Sources:** faq.txt, spring-ai-reference.md"
+
+# Streaming response
+curl -N -X POST http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "spring-ai-chat",
+    "messages": [{"role": "user", "content": "Tell me a joke"}],
+    "stream": true
+  }'
 ```
 
-### Application Configuration
-Key configuration in `application.yaml`:
+Memory persists per Authorization header — same header = same conversation.
+
+## Open WebUI Integration
+
+```bash
+# Start Open WebUI alongside PostgreSQL
+docker compose --profile ui up -d
+```
+
+Open `http://localhost:3000`, create an account, then:
+
+1. Go to **Settings → Admin → Connections**
+2. Add OpenAI connection: `http://host.docker.internal:8080/v1`
+3. Select model: `spring-ai-chat` (general) or `spring-ai-rag` (document-grounded)
+
+## Architecture
+
+```text
+Request → ChatController → ChatClient
+                              ├── RetrievalAugmentationAdvisor (RAG)
+                              ├── MessageChatMemoryAdvisor (conversation history)
+                              └── DocumentTools (@Tool functions)
+                                      │
+              ┌─────────────────────┼─────────────────────┐
+              ▼                     ▼                     ▼
+           OpenAI              PGVector              PostgreSQL
+        (GPT-4o-mini)         (vectors)            (chat memory)
+```
+
+## Project Layout
+
+```text
+src/main/java/com/arvindand/rag/
+├── config/
+│   ├── ChatClientConfig.java    # ChatClient + advisors
+│   └── MemoryConfig.java        # JDBC chat memory
+├── controller/
+│   ├── ChatController.java      # /api/v2/chat
+│   ├── DocumentController.java  # /api/v2/documents
+│   └── OpenAICompatibleController.java
+├── service/
+│   └── DocumentService.java     # document ingestion
+└── tools/
+    └── DocumentTools.java       # @Tool methods
+```
+
+## Key Patterns
+
+**RetrievalAugmentationAdvisor** — The 1.1 approach to RAG. Searches the vector store for relevant chunks and injects them into the prompt context.
+
+**MessageWindowChatMemory** — Keeps the last N messages per conversation, persisted to PostgreSQL via JDBC.
+
+**@Tool annotation** — Methods the LLM can invoke. Spring AI generates the JSON schema and handles the function calling protocol.
+
+## Config
+
 ```yaml
 spring:
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY}
       chat:
         options:
           model: gpt-4o-mini
           temperature: 0.7
     vectorstore:
       pgvector:
-        initialize-schema: true
+        dimensions: 1536
+        index-type: hnsw
 ```
 
-### Docker Setup
-The `compose.yaml` automatically configures:
-- PostgreSQL 16 with PGVector extension
-- Database: `markets`
-- Credentials: `user/password`
-- Port: `5432`
+## Links
 
-## 🚀 Development Workflow
-
-### Adding New Documents
-1. Place PDF files in `src/main/resources/docs/`
-2. Update `DocumentIngestionService` to reference new files
-3. Restart application - new documents will be automatically processed
-
-### Customizing Query Types
-1. Add new prompt templates in `ChatController.SPECIALIZED_PROMPTS`
-2. Create corresponding endpoint methods
-3. Test with sample queries
-
-### Database Management
-```bash
-# Connect to PostgreSQL
-docker exec -it <container_name> psql -U user -d markets
-
-# View vector store tables
-\dt
-
-# Check document count
-SELECT COUNT(*) FROM vector_store;
-```
-
-## 📄 License
-
-MIT License - See [LICENSE](LICENSE) for details.
+- [Spring AI Docs](https://docs.spring.io/spring-ai/reference/)
+- [PGVector](https://github.com/pgvector/pgvector)
+- [Open WebUI](https://github.com/open-webui/open-webui)
