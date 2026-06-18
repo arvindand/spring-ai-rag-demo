@@ -2,6 +2,16 @@ spring:
   application:
     name: spring-ai-rag-demo
 
+  # Virtual threads (Java 21+) for the blocking web/JDBC workload
+  threads:
+    virtual:
+      enabled: true
+
+  # RFC 9457 ProblemDetail error responses
+  mvc:
+    problemdetails:
+      enabled: true
+
   # Docker Compose integration
   docker:
     compose:
@@ -25,9 +35,8 @@ spring:
     openai:
       api-key: ${OPENAI_API_KEY}
       chat:
-        options:
-          model: gpt-4o-mini
-          temperature: 0.7
+        model: gpt-4o-mini
+        temperature: 0.7
 
     # Vector store settings
     vectorstore:
@@ -43,9 +52,6 @@ spring:
         repository:
           jdbc:
             initialize-schema: ALWAYS
-      client:
-        observations:
-          include-input: true
 
 # Server configuration
 server:

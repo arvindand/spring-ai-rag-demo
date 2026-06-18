@@ -1,0 +1,24 @@
+# OpenRouter profile: routes both chat and embeddings through OpenRouter's
+# OpenAI-compatible API instead of OpenAI directly.
+#
+# Activate with:  --spring.profiles.active=openrouter
+#
+# The OpenRouter key is read from an env file (so it never lives in this repo).
+# Drop a local .env next to the project root, or point ENV_FILE at any other .env.
+# The file must contain a line:  OPENROUTER_API_KEY=sk-or-...
+spring:
+  config:
+    import: "optional:file:${ENV_FILE:.env}[.properties]"
+
+  ai:
+    openai:
+      api-key: ${OPENROUTER_API_KEY}
+      # Spring AI 2.0 wraps the official OpenAI SDK, whose base-url INCLUDES the version path
+      # (cf. the Groq example: https://api.groq.com/openai/v1)
+      base-url: https://openrouter.ai/api/v1
+      chat:
+        # OpenRouter uses provider-prefixed model ids
+        model: openai/gpt-4o-mini
+      embedding:
+        # Must stay 1536-dim to match spring.ai.vectorstore.pgvector.dimensions
+        model: openai/text-embedding-3-small

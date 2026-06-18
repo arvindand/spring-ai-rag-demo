@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Configuration for chat memory with JDBC persistence.
  *
- * <p>This demonstrates Spring AI 1.1's chat memory capabilities:
+ * <p>This demonstrates Spring AI 2.0's chat memory capabilities:
  *
  * <ul>
  *   <li>JDBC-backed persistence for conversation history

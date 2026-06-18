@@ -27,6 +27,10 @@ replay_pid*
 target/
 build/
 
+# Local environment / secrets
+.env
+.env.*
+
 # macOS metadata files
 .DS_Store
 

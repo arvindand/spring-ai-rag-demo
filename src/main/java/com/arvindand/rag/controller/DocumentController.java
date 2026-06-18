@@ -2,6 +2,7 @@ package com.arvindand.rag.controller;
 
 import com.arvindand.rag.model.DocumentUploadResponse;
 import com.arvindand.rag.service.DocumentService;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -63,7 +64,7 @@ public class DocumentController {
   @PostMapping(value = "/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public List<DocumentUploadResponse> uploadDocuments(
       @RequestParam("files") MultipartFile[] files) {
-    return java.util.Arrays.stream(files).map(documentService::uploadDocument).toList();
+    return Arrays.stream(files).map(documentService::uploadDocument).toList();
   }
 
   /**

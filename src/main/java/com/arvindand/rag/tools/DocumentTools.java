@@ -12,10 +12,10 @@ import org.springframework.stereotype.Component;
  * AI Tools for document search and analysis.
  *
  * <p>These tools enable the AI model to programmatically search and analyze documents in the vector
- * store during conversations. This demonstrates Spring AI 1.1's function calling capabilities.
+ * store during conversations. This demonstrates Spring AI 2.0's tool-calling capabilities.
  *
- * <p>The AI model can invoke these tools when it determines additional document context would help
- * answer a user's question.
+ * <p>Registered on the RAG {@code ChatClient} via {@code defaultTools(...)}, so the model can invoke
+ * them when it determines additional document context would help answer a user's question.
  *
  * @author Arvind Menon
  */

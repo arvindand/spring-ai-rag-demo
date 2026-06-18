@@ -14,12 +14,7 @@ import java.util.List;
  */
 public record ChatResponse(
     String content, String conversationId, List<String> sources, Instant timestamp) {
-  /** Creates a simple response without sources. */
-  public static ChatResponse of(String content, String conversationId) {
-    return new ChatResponse(content, conversationId, List.of(), Instant.now());
-  }
-
-  /** Creates a response with source documents. */
+  /** Creates a response, defaulting the timestamp to now. */
   public static ChatResponse withSources(
       String content, String conversationId, List<String> sources) {
     return new ChatResponse(content, conversationId, sources, Instant.now());

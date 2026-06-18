@@ -1,5 +1,6 @@
 package com.arvindand.rag.config;
 
+import com.arvindand.rag.tools.DocumentTools;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
@@ -14,7 +15,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Configuration for ChatClient with advanced RAG patterns.
  *
- * <p>This configuration showcases Spring AI 1.1's modular RAG architecture with:
+ * <p>This configuration showcases Spring AI 2.0's modular RAG architecture with:
  *
  * <ul>
  *   <li>Query rewriting for improved retrieval
@@ -51,7 +52,10 @@ public class ChatClientConfig {
    */
   @Bean
   ChatClient chatClient(
-      ChatClient.Builder chatClientBuilder, VectorStore vectorStore, ChatMemory chatMemory) {
+      ChatClient.Builder chatClientBuilder,
+      VectorStore vectorStore,
+      ChatMemory chatMemory,
+      DocumentTools documentTools) {
 
     // Build the modular RAG advisor with query transformation
     var ragAdvisor =
@@ -63,7 +67,10 @@ public class ChatClientConfig {
             .documentRetriever(
                 VectorStoreDocumentRetriever.builder()
                     .vectorStore(vectorStore)
-                    .similarityThreshold(0.5)
+                    // 0.3 keeps recall high for a small curated knowledge base; cosine
+                    // similarities from text-embedding-3-small rarely exceed ~0.5 even for
+                    // strong topical matches, so 0.5 was filtering out valid context.
+                    .similarityThreshold(0.3)
                     .topK(5)
                     .build())
             .build();
@@ -77,6 +84,8 @@ public class ChatClientConfig {
             ragAdvisor,
             // Logging for observability
             new SimpleLoggerAdvisor())
+        // @Tool methods the model can invoke to search the knowledge base on demand
+        .defaultTools(documentTools)
         .build();
   }
 

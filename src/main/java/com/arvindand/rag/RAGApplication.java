@@ -1,20 +1,17 @@
 package com.arvindand.rag;
 
-import com.arvindand.rag.service.DocumentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-import org.springframework.core.io.Resource;
 
 /**
  * Spring AI RAG Demo Application.
  *
- * <p>A comprehensive demonstration of Retrieval-Augmented Generation (RAG) patterns using Spring AI
- * 1.1, featuring:
+ * <p>A demonstration of Retrieval-Augmented Generation (RAG) patterns using Spring AI 2.0,
+ * featuring:
  *
  * <ul>
  *   <li>Modular RAG pipeline with query transformation
@@ -36,23 +33,21 @@ public class RAGApplication {
     SpringApplication.run(RAGApplication.class, args);
   }
 
-  /** Loads sample documents on application startup if vector store is empty. */
+  /** Prints the available endpoints once the application is ready. */
   @Bean
-  CommandLineRunner initializeSampleDocuments(
-      DocumentService documentService, @Value("classpath:/docs/") Resource docsFolder) {
+  CommandLineRunner startupBanner() {
     return args -> {
       LOG.info("=".repeat(60));
-      LOG.info("Spring AI RAG Demo - Starting Up");
+      LOG.info("Spring AI RAG Demo - ready");
       LOG.info("=".repeat(60));
-      LOG.info("");
       LOG.info("API Endpoints:");
-      LOG.info("  POST /api/v2/chat         - Chat with RAG");
-      LOG.info("  GET  /api/v2/chat/stream  - Streaming chat (SSE)");
-      LOG.info("  POST /api/v2/documents    - Upload documents");
+      LOG.info("  POST   /api/v2/chat         - Chat with RAG (returns cited sources)");
+      LOG.info("  GET    /api/v2/chat/stream  - Streaming chat (SSE)");
+      LOG.info("  POST   /api/v2/documents    - Upload a document to the knowledge base");
+      LOG.info("  DELETE /api/v2/documents/{{id}} - Remove a document");
+      LOG.info("  POST   /v1/chat/completions - OpenAI-compatible API (Open WebUI)");
       LOG.info("");
-      LOG.info("To test with Open WebUI, run:");
-      LOG.info("  docker compose --profile ui up -d");
-      LOG.info("  Then open http://localhost:3000");
+      LOG.info("To test with Open WebUI: docker compose --profile ui up -d  ->  http://localhost:3000");
       LOG.info("=".repeat(60));
     };
   }
