@@ -1,14 +1,14 @@
 # Spring AI RAG Demo
 
-RAG implementation using Spring AI 2.0.0, PGVector, and OpenAI. Includes conversation memory, tool calling, streaming, and an OpenAI-compatible API for Open WebUI integration.
+RAG implementation using Spring AI 2.0.1, PGVector, and OpenAI. Includes conversation memory, tool calling, streaming, and an OpenAI-compatible API for Open WebUI integration.
 
 ## Stack
 
-- Spring Boot 4.1.0 / Spring AI 2.0.0
+- Spring Boot 4.1.1 / Spring AI 2.0.1
 - Java 25 (virtual threads enabled)
 - OpenAI GPT-4o-mini
-- PostgreSQL 17 + PGVector
-- Open WebUI (optional)
+- PostgreSQL 17 + PGVector 0.8.7
+- Open WebUI 0.11.4 (optional chat interface)
 
 ## Quick Start
 
@@ -24,6 +24,19 @@ docker compose up -d
 ```
 
 App runs on `localhost:8080`.
+
+In another terminal, upload the bundled learning documents before asking RAG questions:
+
+```bash
+curl -X POST http://localhost:8080/api/v2/documents/batch \
+  -F "files=@src/main/resources/docs/spring-ai-reference.md" \
+  -F "files=@src/main/resources/docs/faq.txt" \
+  -F "files=@src/main/resources/docs/rag-patterns.md"
+```
+
+The app does not ingest these files automatically. Upload them once for a fresh database;
+repeating the upload creates another copy. Each response includes a `documentId` you can
+use with the delete endpoint below. Uploading uses the configured embedding provider.
 
 ## Testing the API
 
@@ -88,7 +101,7 @@ curl http://localhost:8080/v1/models
 # General chat (no RAG)
 curl -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer my-session" \
+  -H "Authorization: Bearer my-api-key" \
   -d '{
     "model": "spring-ai-chat",
     "messages": [{"role": "user", "content": "What is 2+2?"}]
@@ -97,7 +110,7 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 # RAG-enabled chat (uses documents, shows sources)
 curl -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer my-session" \
+  -H "Authorization: Bearer my-api-key" \
   -d '{
     "model": "spring-ai-rag",
     "messages": [{"role": "user", "content": "What is Spring AI?"}]
@@ -114,9 +127,38 @@ curl -N -X POST http://localhost:8080/v1/chat/completions \
   }'
 ```
 
-Memory persists per Authorization header — same header = same conversation.
+`/v1/chat/completions` is stateless: send the complete text conversation in `messages`
+on each request, including `system`, `user`, and `assistant` turns in order. The
+Authorization header is not a conversation identifier, so separate Open WebUI chats
+using the same connection key do not share history. Other roles and multimodal
+content are not supported by this demo.
+
+RAG requests also need a non-blank latest user message for document retrieval;
+system-only or blank-query RAG transcripts return HTTP 400.
+
+For example, a follow-up request supplies the earlier exchange explicitly:
+
+```json
+{
+  "model": "spring-ai-chat",
+  "messages": [
+    {"role": "system", "content": "Answer briefly."},
+    {"role": "user", "content": "My name is Alice."},
+    {"role": "assistant", "content": "Hello Alice."},
+    {"role": "user", "content": "What is my name?"}
+  ]
+}
+```
+
+`/api/v2/chat` continues to store conversation memory under its explicit
+`conversationId`, so that endpoint only needs the new message on each turn.
 
 ## Open WebUI Integration
+
+Compose pins Open WebUI to stable `v0.11.4`. If you previously used `main`, check
+that this release can read the database in your existing `openwebui_data` volume
+before switching; `main` may contain newer migrations. For a fresh demo, use a
+separate empty Open WebUI volume and keep the existing volume intact.
 
 ```bash
 # Start Open WebUI alongside PostgreSQL
@@ -135,9 +177,9 @@ Request ─┬─ ChatController             (/api/v2/chat, /stream)
          └─ OpenAICompatibleController  (/v1/chat/completions, Open WebUI)
                        │
                        ▼
-                   ChatClient
+                   ChatClient (separate stateless /v1 clients)
                     ├── RetrievalAugmentationAdvisor (query rewrite + vector search)
-                    ├── MessageChatMemoryAdvisor      (conversation history)
+                    ├── MessageChatMemoryAdvisor      (/api/v2 only)
                     └── DocumentTools                 (@Tool functions)
                            │
          ┌─────────────────┼──────────────────┐

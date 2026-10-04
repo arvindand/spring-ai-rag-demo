@@ -2,19 +2,27 @@ package com.arvindand.rag.controller;
 
 import com.arvindand.rag.service.ChatResponseReader;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClientResponse;
-import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 
 /**
@@ -28,7 +36,9 @@ import reactor.core.publisher.Flux;
  * </ul>
  *
  * <p>Streaming is selected by the {@code stream} field in the request body (per the OpenAI spec),
- * and chunks are serialised as proper Server-Sent Events rather than hand-assembled JSON.
+ * and chunks are serialised as proper Server-Sent Events rather than hand-assembled JSON. Each
+ * request is stateless: its messages are the entire conversation, and Authorization is not used as
+ * a conversation identifier.
  *
  * @author Arvind Menon
  */
@@ -44,8 +54,8 @@ public class OpenAICompatibleController {
   private final ChatResponseReader reader;
 
   public OpenAICompatibleController(
-      @Qualifier("chatClient") ChatClient ragChatClient,
-      @Qualifier("simpleChatClient") ChatClient simpleChatClient,
+      @Qualifier("statelessRagChatClient") ChatClient ragChatClient,
+      @Qualifier("statelessSimpleChatClient") ChatClient simpleChatClient,
       ChatResponseReader reader) {
     this.ragChatClient = ragChatClient;
     this.simpleChatClient = simpleChatClient;
@@ -53,34 +63,28 @@ public class OpenAICompatibleController {
   }
 
   /**
-   * OpenAI-compatible chat completions. Returns a single JSON response, or an SSE stream of
-   * {@code chat.completion.chunk} events when {@code stream} is {@code true}.
+   * OpenAI-compatible chat completions. Returns a single JSON response, or an SSE stream of {@code
+   * chat.completion.chunk} events when {@code stream} is {@code true}.
    */
   @PostMapping(
       value = "/chat/completions",
       produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.TEXT_EVENT_STREAM_VALUE})
-  public Object chatCompletions(
-      @RequestBody ChatCompletionRequest request,
-      @RequestHeader(value = "Authorization", required = false) String authHeader) {
+  public Object chatCompletions(@RequestBody ChatCompletionRequest request) {
 
-    String conversationId = deriveConversationId(authHeader);
-    String userMessage = extractLastUserMessage(request.messages());
+    Prompt prompt = toPrompt(request.messages());
+    if (MODEL_RAG.equalsIgnoreCase(request.model())
+        && prompt.getUserMessage().getText().isBlank()) {
+      throw badRequest("RAG requests need a non-blank latest user message");
+    }
     ChatClient client = selectClient(request.model());
 
     return Boolean.TRUE.equals(request.stream())
-        ? stream(client, request.model(), userMessage, conversationId)
-        : complete(client, request.model(), userMessage, conversationId);
+        ? stream(client, request.model(), prompt)
+        : complete(client, request.model(), prompt);
   }
 
-  private ChatCompletionResponse complete(
-      ChatClient client, String model, String userMessage, String conversationId) {
-    ChatClientResponse response =
-        client
-            .prompt()
-            .user(userMessage)
-            .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, conversationId))
-            .call()
-            .chatClientResponse();
+  private ChatCompletionResponse complete(ChatClient client, String model, Prompt prompt) {
+    ChatClientResponse response = client.prompt(prompt).call().chatClientResponse();
 
     String content = reader.text(response);
     if (MODEL_RAG.equalsIgnoreCase(model)) {
@@ -92,16 +96,11 @@ public class OpenAICompatibleController {
     return ChatCompletionResponse.of(model, content);
   }
 
-  private Flux<ServerSentEvent<Object>> stream(
-      ChatClient client, String model, String userMessage, String conversationId) {
+  private Flux<ServerSentEvent<Object>> stream(ChatClient client, String model, Prompt prompt) {
     String id = "chatcmpl-" + shortId();
     long created = epochSeconds();
 
-    return client
-        .prompt()
-        .user(userMessage)
-        .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, conversationId))
-        .stream()
+    return client.prompt(prompt).stream()
         .content()
         .map(chunk -> sse(ChatCompletionChunk.delta(id, created, model, chunk)))
         .concatWith(Flux.just(sse(ChatCompletionChunk.stop(id, created, model))))
@@ -123,23 +122,45 @@ public class OpenAICompatibleController {
     return MODEL_RAG.equalsIgnoreCase(model) ? ragChatClient : simpleChatClient;
   }
 
-  /** Derives a stable conversation id from the Authorization header for session continuity. */
-  private String deriveConversationId(String authHeader) {
-    return (authHeader == null || authHeader.isBlank())
-        ? "default-session"
-        : "session-" + Integer.toHexString(authHeader.hashCode());
+  /** Converts the supported text-only roles without discarding or reordering the transcript. */
+  private Prompt toPrompt(List<Message> messages) {
+    if (messages == null || messages.isEmpty()) {
+      throw badRequest("messages must contain at least one message");
+    }
+    List<org.springframework.ai.chat.messages.Message> transcript =
+        messages.stream()
+            .<org.springframework.ai.chat.messages.Message>map(
+                message -> {
+                  if (message == null || message.role() == null || message.content() == null) {
+                    throw badRequest("Each message needs a role and text content");
+                  }
+                  return switch (message.role().toLowerCase(Locale.ROOT)) {
+                    case "system" -> new SystemMessage(message.content());
+                    case "user" -> new UserMessage(message.content());
+                    case "assistant" -> new AssistantMessage(message.content());
+                    default ->
+                        throw badRequest("Supported message roles are system, user, and assistant");
+                  };
+                })
+            .toList();
+    return new Prompt(transcript);
   }
 
-  /** Returns the most recent user message, falling back to the last message of any role. */
-  private String extractLastUserMessage(List<Message> messages) {
-    if (messages == null || messages.isEmpty()) {
-      return "";
-    }
-    return messages.reversed().stream()
-        .filter(message -> "user".equalsIgnoreCase(message.role()))
-        .map(Message::content)
-        .findFirst()
-        .orElseGet(() -> messages.getLast().content());
+  private static ResponseStatusException badRequest(String detail) {
+    return new ResponseStatusException(HttpStatus.BAD_REQUEST, detail);
+  }
+
+  /** Keep request errors as 400 responses rather than the application's generic error handler. */
+  @ExceptionHandler(ResponseStatusException.class)
+  public ProblemDetail handleInvalidRequest(ResponseStatusException exception) {
+    return exception.getBody();
+  }
+
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ProblemDetail handleUnreadableRequest(HttpMessageNotReadableException exception) {
+    return ProblemDetail.forStatusAndDetail(
+        HttpStatus.BAD_REQUEST,
+        "Request must be valid JSON with messages containing a role and string content");
   }
 
   private static ServerSentEvent<Object> sse(Object data) {
@@ -157,7 +178,11 @@ public class OpenAICompatibleController {
   // --- Request/response DTOs following the OpenAI API spec (serialised by Jackson) ---
 
   public record ChatCompletionRequest(
-      String model, List<Message> messages, Double temperature, Integer max_tokens, Boolean stream) {}
+      String model,
+      List<Message> messages,
+      Double temperature,
+      Integer max_tokens,
+      Boolean stream) {}
 
   public record Message(String role, String content) {}
 

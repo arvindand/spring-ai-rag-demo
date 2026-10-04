@@ -1,7 +1,7 @@
 services:
   # PostgreSQL with PGVector for vector storage and chat memory
   pgvector:
-    image: "pgvector/pgvector:pg17"
+    image: "pgvector/pgvector:0.8.7-pg17"
     container_name: ragdemo-pgvector
     environment:
       - "POSTGRES_DB=ragdemo"
@@ -22,7 +22,7 @@ services:
   # Open WebUI - Chat interface for testing (optional)
   # Access at http://localhost:3000
   open-webui:
-    image: "ghcr.io/open-webui/open-webui:main"
+    image: "ghcr.io/open-webui/open-webui:v0.11.4"
     container_name: ragdemo-openwebui
     profiles:
       - ui

@@ -57,12 +57,28 @@ public class ChatClientConfig {
       ChatMemory chatMemory,
       DocumentTools documentTools) {
 
+    return ragClientBuilder(chatClientBuilder, vectorStore, documentTools)
+        .defaultSystem(DEFAULT_SYSTEM_PROMPT)
+        .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+        .build();
+  }
+
+  /** RAG client for /v1, where the caller supplies the complete conversation on every request. */
+  @Bean
+  ChatClient statelessRagChatClient(
+      ChatClient.Builder chatClientBuilder, VectorStore vectorStore, DocumentTools documentTools) {
+    return ragClientBuilder(chatClientBuilder, vectorStore, documentTools).build();
+  }
+
+  private ChatClient.Builder ragClientBuilder(
+      ChatClient.Builder chatClientBuilder, VectorStore vectorStore, DocumentTools documentTools) {
+
     // Build the modular RAG advisor with query transformation
     var ragAdvisor =
         RetrievalAugmentationAdvisor.builder()
             .queryTransformers(
                 RewriteQueryTransformer.builder()
-                    .chatClientBuilder(chatClientBuilder.build().mutate())
+                    .chatClientBuilder(chatClientBuilder.clone())
                     .build())
             .documentRetriever(
                 VectorStoreDocumentRetriever.builder()
@@ -76,26 +92,32 @@ public class ChatClientConfig {
             .build();
 
     return chatClientBuilder
-        .defaultSystem(DEFAULT_SYSTEM_PROMPT)
+        .clone()
         .defaultAdvisors(
-            // Chat memory for conversation continuity
-            MessageChatMemoryAdvisor.builder(chatMemory).build(),
             // RAG for document-grounded responses
             ragAdvisor,
             // Logging for observability
             new SimpleLoggerAdvisor())
         // @Tool methods the model can invoke to search the knowledge base on demand
-        .defaultTools(documentTools)
-        .build();
+        .defaultTools(documentTools);
   }
 
   /** Creates a basic ChatClient without RAG for simple chat operations. */
   @Bean
   ChatClient simpleChatClient(ChatClient.Builder chatClientBuilder, ChatMemory chatMemory) {
     return chatClientBuilder
+        .clone()
         .defaultSystem("You are a helpful AI assistant.")
         .defaultAdvisors(
             MessageChatMemoryAdvisor.builder(chatMemory).build(), new SimpleLoggerAdvisor())
         .build();
+  }
+
+  /**
+   * Plain /v1 client with no memory advisor or default messages added to the supplied transcript.
+   */
+  @Bean
+  ChatClient statelessSimpleChatClient(ChatClient.Builder chatClientBuilder) {
+    return chatClientBuilder.clone().defaultAdvisors(new SimpleLoggerAdvisor()).build();
   }
 }
