@@ -5,17 +5,17 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.1.2</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.arvindand.rag</groupId>
     <artifactId>spring-ai-rag-demo</artifactId>
-    <version>3.0.0</version>
+    <version>3.0.1</version>
     <name>spring-ai-rag-demo</name>
     <description>RAG showcase with Spring AI 2.0 - modular RAG, chat memory, streaming, tool calling, and an OpenAI-compatible API</description>
     <properties>
         <java.version>25</java.version>
-        <spring-ai.version>2.0.1</spring-ai.version>
+        <spring-ai.version>2.0.2</spring-ai.version>
     </properties>
     <dependencies>
         <!-- Spring Boot Core -->

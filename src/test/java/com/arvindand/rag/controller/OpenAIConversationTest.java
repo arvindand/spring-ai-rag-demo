@@ -1,13 +1,17 @@
 package com.arvindand.rag.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.arvindand.rag.config.ChatClientConfig;
 import com.arvindand.rag.model.ChatRequest;
 import com.arvindand.rag.service.ChatResponseReader;
+import com.arvindand.rag.service.DocumentService;
 import com.arvindand.rag.tools.DocumentTools;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +36,7 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import reactor.core.publisher.Flux;
@@ -63,12 +68,17 @@ class OpenAIConversationTest {
         ChatClientConfig.class,
         OpenAICompatibleController.class,
         ChatController.class,
+        DocumentController.class,
+        DocumentService.class,
         ChatResponseReader.class,
         DocumentTools.class);
     context.refresh();
     controller = context.getBean(OpenAICompatibleController.class);
     mvc =
-        MockMvcBuilders.standaloneSetup(controller)
+        MockMvcBuilders.standaloneSetup(
+                controller,
+                context.getBean(DocumentController.class),
+                context.getBean(ChatController.class))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -76,6 +86,35 @@ class OpenAIConversationTest {
   @AfterEach
   void closeContext() {
     context.close();
+  }
+
+  @Test
+  void uploadedDocumentReachesTheRagPromptAndCitedAnswer() throws Exception {
+    String policy = "The Atlas project retention policy keeps audit records for exactly 42 days.";
+    mvc.perform(
+            multipart("/api/v2/documents")
+                .file(
+                    new MockMultipartFile(
+                        "file",
+                        "policy.txt",
+                        "text/plain",
+                        policy.getBytes(StandardCharsets.UTF_8))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("SUCCESS"))
+        .andExpect(jsonPath("$.chunksCreated").value(1));
+
+    mvc.perform(
+            post("/api/v2/chat")
+                .contentType("application/json")
+                .content(
+                    """
+                {"message":"How long are Atlas audit records kept?","conversationId":"upload-smoke","useRag":true}
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content").value("Synthetic reply"))
+        .andExpect(jsonPath("$.sources[0]").value("policy.txt"));
+
+    assertThat(model.lastPrompt().getUserMessage().getText()).contains(policy);
   }
 
   @Test
@@ -269,8 +308,13 @@ class OpenAIConversationTest {
   }
 
   private static class StubVectorStore implements VectorStore {
+    private List<Document> documents =
+        List.of(new Document("Sample document context", Map.of("source", "faq.txt")));
+
     @Override
-    public void add(List<Document> documents) {}
+    public void add(List<Document> documents) {
+      this.documents = List.copyOf(documents);
+    }
 
     @Override
     public void delete(List<String> ids) {}
@@ -280,7 +324,7 @@ class OpenAIConversationTest {
 
     @Override
     public List<Document> similaritySearch(SearchRequest request) {
-      return List.of(new Document("Sample document context", Map.of("source", "faq.txt")));
+      return documents;
     }
   }
 }
