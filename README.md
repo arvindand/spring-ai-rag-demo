@@ -1,10 +1,10 @@
 # Spring AI RAG Demo
 
-RAG implementation using Spring AI 2.0.1, PGVector, and OpenAI. Includes conversation memory, tool calling, streaming, and an OpenAI-compatible API for Open WebUI integration.
+RAG implementation using Spring AI 2.0.2, PGVector, and OpenAI. Includes conversation memory, tool calling, streaming, and an OpenAI-compatible API for Open WebUI integration.
 
 ## Stack
 
-- Spring Boot 4.1.1 / Spring AI 2.0.1
+- Spring Boot 4.1.2 / Spring AI 2.0.2
 - Java 25 (virtual threads enabled)
 - OpenAI GPT-4o-mini
 - PostgreSQL 17 + PGVector 0.8.7
@@ -267,3 +267,7 @@ The same applies to other gateways (Groq, NVIDIA, local model runners) — just 
 - [Spring AI Docs](https://docs.spring.io/spring-ai/reference/)
 - [PGVector](https://github.com/pgvector/pgvector)
 - [Open WebUI](https://github.com/open-webui/open-webui)
+
+## Release checks
+
+`./mvnw clean verify` runs the conversation tests and an upload → retrieval → cited-answer smoke test with the real document reader, splitter and RAG advisors. The model and vector store run in-process; this checks application wiring without an API key or PostgreSQL, not embedding quality or PGVector integration. CI runs on pushes and pull requests.
